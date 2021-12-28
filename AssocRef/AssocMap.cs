@@ -1,11 +1,16 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Volight.AssocRefs;
 
 public sealed class AssocMap<K, V> where K : notnull
 {
     readonly ConcurrentDictionary<K, RefCount<K, V>> Map = new();
+    internal ReaderWriterLockSlim rwlock = new();
+
+    public int Count => Map.Count;
 
     public AssocRef<V> GetOrAdd(K key, Func<K, V> valueFactory) => new(Map.GetOrAdd(key, key => new RefCount<K, V>(this, key, valueFactory(key))));
 

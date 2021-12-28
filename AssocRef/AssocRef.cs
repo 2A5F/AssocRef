@@ -11,7 +11,6 @@ public sealed class AssocRef<T> : IDisposable, ICloneable, IEquatable<AssocRef<T
     internal AssocRef(IRefCount<T> rc)
     {
         this.rc = rc;
-        rc.Inc();
     }
 
     public T Value { get => rc.Value; set => rc.Value = value; }
@@ -23,10 +22,7 @@ public sealed class AssocRef<T> : IDisposable, ICloneable, IEquatable<AssocRef<T
         return oldValue;
     }
 
-    ~AssocRef()
-    {
-        Dispose();
-    }
+    ~AssocRef() => Dispose();
 
     public void Dispose()
     {

@@ -1,4 +1,6 @@
-﻿using System.Threading;
+﻿using System;
+using System.Diagnostics;
+using System.Threading;
 
 namespace Volight.AssocRefs;
 
@@ -7,7 +9,7 @@ internal sealed class RefCount<K, V> : IRefCount<V> where K : notnull
     readonly AssocMap<K, V> Map;
     public readonly K Key;
     public V Value { get; set; }
-    volatile uint count = 0;
+    ulong count = 0;
 
     public RefCount<K, V> Set(V value)
     {
@@ -29,7 +31,7 @@ internal sealed class RefCount<K, V> : IRefCount<V> where K : notnull
 
     public void Drop()
     {
-        if (Interlocked.Decrement(ref count) == 0)
+        if (checked(Interlocked.Decrement(ref count) == 0))
         {
             Map.Drop(this);
         }

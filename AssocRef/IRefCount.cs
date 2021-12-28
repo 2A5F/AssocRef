@@ -10,7 +10,5 @@ internal interface IRefCount<T>
 {
     T Value { get; set; }
 
-    void Inc();
-
     void Drop();
 }
