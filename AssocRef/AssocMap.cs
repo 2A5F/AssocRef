@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Volight.AssocRefs;
+namespace AssocRefs;
 
 public class AssocMap<K, V> where K : notnull
 {

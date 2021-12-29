@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace Volight.AssocRefs;
+namespace AssocRefs;
 
 public sealed class AssocRef<T> : IDisposable, ICloneable, IEquatable<AssocRef<T>>, IEquatable<T>
 {

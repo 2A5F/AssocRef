@@ -1,15 +1,15 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<Version>0.0.1</Version>
+	<Version>0.1.0</Version>
     <TargetFramework>net5.0</TargetFramework>
-	<RootNamespace>Volight.AssocRefs</RootNamespace>
+	<RootNamespace>AssocRefs</RootNamespace>
 	<LangVersion>10.0</LangVersion>
 	<Nullable>enable</Nullable>
-	<PackageProjectUrl>https://github.com/volight/AssocRef</PackageProjectUrl>
-	<RepositoryUrl>https://github.com/volight/AssocRef</RepositoryUrl>
+	<PackageProjectUrl>https://github.com/2A5F/AssocRef</PackageProjectUrl>
+	<RepositoryUrl>https://github.com/2A5F/AssocRef</RepositoryUrl>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
-	<Copyright>volight</Copyright>
+	<Copyright>2A5F</Copyright>
 	<Description>Reverse (value to key) weak reference mapping</Description>
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
