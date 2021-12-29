@@ -17,7 +17,7 @@ namespace Test
         [Test]
         public void Test1()
         {
-            var map = new AssocMap2<int, int>();
+            var map = new AssocMap<int, int>();
             int v = 0;
             for (int i = 0; i < 100; i++)
             {
@@ -51,7 +51,7 @@ namespace Test
         {
             var v = 0;
             var counter = new Counter();
-            var map = new AssocMap2<int, DeObj>();
+            var map = new AssocMap<int, DeObj>();
             for (int i = 0; i < 100; i++)
             {
                 Task.WaitAll(Enumerable.Range(0, 100).Select(i => Task.Run(() =>

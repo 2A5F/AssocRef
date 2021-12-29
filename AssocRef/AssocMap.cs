@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Volight.AssocRefs;
 
-public class AssocMap2<K, V> where K : notnull
+public class AssocMap<K, V> where K : notnull
 {
     // Basically copied from dotnet/runtime/src/libraries/System.Collections.Concurrent/src/System/Collections/Concurrent/ConcurrentDictionary.cs
 
@@ -25,15 +25,15 @@ public class AssocMap2<K, V> where K : notnull
 
     static int DefaultConcurrencyLevel => Environment.ProcessorCount;
 
-    public AssocMap2() : this(DefaultConcurrencyLevel, DefaultCapacity, growLockArray: true, null) { }
+    public AssocMap() : this(DefaultConcurrencyLevel, DefaultCapacity, growLockArray: true, null) { }
 
-    internal AssocMap2(int concurrencyLevel, int capacity) : this(concurrencyLevel, capacity, growLockArray: false, null) { }
+    internal AssocMap(int concurrencyLevel, int capacity) : this(concurrencyLevel, capacity, growLockArray: false, null) { }
 
-    internal AssocMap2(IEqualityComparer<K>? comparer) : this(DefaultConcurrencyLevel, DefaultCapacity, growLockArray: true, comparer) { }
+    internal AssocMap(IEqualityComparer<K>? comparer) : this(DefaultConcurrencyLevel, DefaultCapacity, growLockArray: true, comparer) { }
 
-    internal AssocMap2(int concurrencyLevel, int capacity, IEqualityComparer<K>? comparer) : this(concurrencyLevel, capacity, growLockArray: false, comparer) { }
+    internal AssocMap(int concurrencyLevel, int capacity, IEqualityComparer<K>? comparer) : this(concurrencyLevel, capacity, growLockArray: false, comparer) { }
 
-    internal AssocMap2(int concurrencyLevel, int capacity, bool growLockArray, IEqualityComparer<K>? comparer)
+    internal AssocMap(int concurrencyLevel, int capacity, bool growLockArray, IEqualityComparer<K>? comparer)
     {
         if (concurrencyLevel < 1) throw new ArgumentOutOfRangeException(nameof(concurrencyLevel));
         if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
@@ -472,7 +472,7 @@ public class AssocMap2<K, V> where K : notnull
 
     sealed class Node : IRefCount<V>
     {
-        readonly AssocMap2<K, V> map;
+        readonly AssocMap<K, V> map;
         public readonly K key;
         public V value;
         public volatile Node? next;
@@ -481,7 +481,7 @@ public class AssocMap2<K, V> where K : notnull
 
         public V Value { get => value; set => this.value = value; }
 
-        public Node(AssocMap2<K, V> map, K key, V value, int hashcode, Node? next)
+        public Node(AssocMap<K, V> map, K key, V value, int hashcode, Node? next)
         {
             this.map = map;
             this.key = key;
