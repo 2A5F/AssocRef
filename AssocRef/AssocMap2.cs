@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Volight.AssocRefs;
 
-class AssocMap2<K, V> where K : notnull
+public class AssocMap2<K, V> where K : notnull
 {
     // Basically copied from dotnet/runtime/src/libraries/System.Collections.Concurrent/src/System/Collections/Concurrent/ConcurrentDictionary.cs
 
@@ -55,7 +55,7 @@ class AssocMap2<K, V> where K : notnull
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    int GetHashCode(K key) => comparer == null ? GetHashCode(key) : comparer.GetHashCode(key);
+    int GetHashCode(K key) => comparer == null ? key.GetHashCode() : comparer.GetHashCode(key);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     bool ComparerEquals(K a, K b) => comparer is null ? defaultComparer.Equals(a, b) : comparer.Equals(a, b);
@@ -245,6 +245,8 @@ class AssocMap2<K, V> where K : notnull
                         Debug.Assert((prev is null && curr == bucket) || prev!.next == curr);
                         if (hashcode == curr.hashcode && ComparerEquals(curr.key, key))
                         {
+                            if (curr.count != 0) return false;
+
                             if (prev is null)
                             {
                                 Volatile.Write(ref bucket, curr.next);
@@ -268,13 +270,204 @@ class AssocMap2<K, V> where K : notnull
             {
                 if (lockTaken) locks[lockNo].ExitWriteLock();
             }
-            
+
         }
     }
 
+    void AcquireAllLocks(ref int locksAcquired)
+    {
+        // First, acquire lock 0
+        AcquireLocks(0, 1, ref locksAcquired);
+
+        // Now that we have lock 0, the _locks array will not change (i.e., grow),
+        // and so we can safely read _locks.Length.
+        AcquireLocks(1, tables.locks.Length, ref locksAcquired);
+        Debug.Assert(locksAcquired == tables.locks.Length);
+    }
+
+    void AcquireLocks(int fromInclusive, int toExclusive, ref int locksAcquired)
+    {
+        Debug.Assert(fromInclusive <= toExclusive);
+        var locks = tables.locks;
+
+        for (int i = fromInclusive; i < toExclusive; i++)
+        {
+            bool lockTaken = false;
+            try
+            {
+                Monitor.Enter(locks[i], ref lockTaken);
+            }
+            finally
+            {
+                if (lockTaken)
+                {
+                    locksAcquired++;
+                }
+            }
+        }
+    }
+
+    void ReleaseLocks(int fromInclusive, int toExclusive)
+    {
+        Debug.Assert(fromInclusive <= toExclusive);
+
+        var tables = this.tables;
+        for (int i = fromInclusive; i < toExclusive; i++)
+        {
+            Monitor.Exit(tables.locks[i]);
+        }
+    }
+
+#if NET5_0
+    const int ArrayMaxLength = 0X7FFFFFC7;
+#else
+    const int ArrayMaxLength = Array.MaxLength;
+#endif
+
     void GrowTable(Tables tables)
     {
+        int locksAcquired = 0;
+        try
+        {
+            AcquireLocks(0, 1, ref locksAcquired);
 
+            if (tables != this.tables) return;
+
+            long approxCount = 0;
+            for (int i = 0; i < tables.countPerLock.Length; i++)
+            {
+                approxCount += tables.countPerLock[i];
+            }
+
+            if (approxCount < tables.buckets.Length / 4)
+            {
+                budget = 2 * budget;
+                if (budget < 0)
+                {
+                    budget = int.MaxValue;
+                }
+                return;
+            }
+
+            int newLength = 0;
+            bool maximizeTableSize = false;
+            try
+            {
+                checked
+                {
+                    newLength = tables.buckets.Length * 2 + 1;
+
+                    // by 3, 5 or 7.
+                    while (newLength % 3 == 0 || newLength % 5 == 0 || newLength % 7 == 0)
+                    {
+                        newLength += 2;
+                    }
+
+                    Debug.Assert(newLength % 2 != 0);
+
+                    if (newLength > ArrayMaxLength)
+                    {
+
+                        maximizeTableSize = true;
+                    }
+                }
+            }
+            catch (OverflowException)
+            {
+                maximizeTableSize = true;
+            }
+
+            if (maximizeTableSize)
+            {
+                newLength = ArrayMaxLength;
+
+                budget = int.MaxValue;
+            }
+
+            var newLocks = tables.locks;
+
+            // Add more locks
+            if (growLockArray && tables.locks.Length < MaxLockNumber)
+            {
+                newLocks = new ReaderWriterLockSlim[tables.locks.Length * 2];
+                Array.Copy(tables.locks, newLocks, tables.locks.Length);
+                for (int i = tables.locks.Length; i < newLocks.Length; i++)
+                {
+                    newLocks[i] = new ReaderWriterLockSlim();
+                }
+            }
+
+            var newBuckets = new Node[newLength];
+            var newCountPerLock = new int[newLocks.Length];
+            var newTables = new Tables(newBuckets, newLocks, newCountPerLock);
+
+            // Now acquire all other locks for the table
+            AcquireLocks(1, tables.locks.Length, ref locksAcquired);
+
+            // Copy all data into a new table, creating new nodes for all elements
+            foreach (Node? bucket in tables.buckets)
+            {
+                Node? current = bucket;
+                while (current != null)
+                {
+                    Node? next = current.next;
+
+                    ref Node? newBucket = ref newTables.GetBucketAndLock(current.hashcode, out uint newLockNo);
+                    current.next = newBucket;
+                    newBucket = current;
+
+                    checked
+                    {
+                        newCountPerLock[newLockNo]++;
+                    }
+                    current = next;
+                }
+            }
+
+            // Adjust the budget
+            budget = Math.Max(1, newBuckets.Length / newLocks.Length);
+
+            // Replace tables with the new versions
+            this.tables = newTables;
+        }
+        finally
+        {
+            ReleaseLocks(0, locksAcquired);
+        }
+    }
+
+    public int Count
+    {
+        get
+        {
+            int acquiredLocks = 0;
+            try
+            {
+                // Acquire all locks
+                AcquireAllLocks(ref acquiredLocks);
+
+                return GetCount();
+            }
+            finally
+            {
+                // Release locks that have been acquired earlier
+                ReleaseLocks(0, acquiredLocks);
+            }
+        }
+    }
+
+    int GetCount()
+    {
+        int count = 0;
+        int[] countPerLocks = tables.countPerLock;
+
+        // Compute the count, we allow overflow
+        for (int i = 0; i < countPerLocks.Length; i++)
+        {
+            count += countPerLocks[i];
+        }
+
+        return count;
     }
 
     sealed class Node : IRefCount<V>
